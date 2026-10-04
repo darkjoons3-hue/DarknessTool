@@ -10,49 +10,91 @@ namespace DarknessTool
     {
         private Bitmap? _backgroundCache;
         private TableLayoutPanel _tiles = null!;
+        private Label _title = null!;
+        private Label _subtitle = null!;
+        private Label _status = null!;
 
-        private static readonly Color BgTop        = Color.FromArgb(0x0A, 0x14, 0x28);
-        private static readonly Color BgBottom     = Color.FromArgb(0x05, 0x0A, 0x14);
-        private static readonly Color GridColor    = Color.FromArgb(13, 0x1A, 0x2A, 0x44);
-        private static readonly Color TriColor     = Color.FromArgb(0x1E, 0x3A, 0x5F);
-        private static readonly Color TriAccent    = Color.FromArgb(0x0E, 0x63, 0x9C);
-        private static readonly Color TextPrimary  = Color.FromArgb(0xE8, 0xE8, 0xE8);
-        private static readonly Color TextSecond   = Color.FromArgb(0x88, 0x99, 0xAA);
+        private static readonly Color BgTop       = Color.FromArgb(0x0A, 0x14, 0x28);
+        private static readonly Color BgBottom    = Color.FromArgb(0x05, 0x0A, 0x14);
+        private static readonly Color GridColor   = Color.FromArgb(13, 0x1A, 0x2A, 0x44);
+        private static readonly Color TriColor    = Color.FromArgb(0x1E, 0x3A, 0x5F);
+        private static readonly Color TriAccent   = Color.FromArgb(0x0E, 0x63, 0x9C);
+        private static readonly Color TextPrimary = Color.FromArgb(0xE8, 0xE8, 0xE8);
+        private static readonly Color TextSecond  = Color.FromArgb(0x88, 0x99, 0xAA);
+        private static readonly Color StatusBg    = Color.FromArgb(0x0F, 0x1E, 0x33);
 
         public MainForm()
         {
             Text = "DarknessTool 1.0";
-            Size = new Size(920, 760);
-            MinimumSize = new Size(740, 560);
+            AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true;
             BackColor = BgTop;
             ForeColor = TextPrimary;
             Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
+            MinimumSize = new Size(600, 480);
 
             BuildUi();
+            ApplyDpiScaling();
+
+            // Начальный размер — с учётом DPI, но не больше рабочего стола
+            var wa = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
+            int targetW = Math.Min(LogicalToDeviceUnits(920), wa.Width - 20);
+            int targetH = Math.Min(LogicalToDeviceUnits(760), wa.Height - 20);
+            Size = new Size(targetW, targetH);
+        }
+
+        private float DpiScale => DeviceDpi / 96f;
+
+        protected override void OnDpiChanged(DpiChangedEventArgs e)
+        {
+            base.OnDpiChanged(e);
+            _backgroundCache?.Dispose();
+            _backgroundCache = null;
+            ApplyDpiScaling();
+            Invalidate();
+        }
+
+        private void ApplyDpiScaling()
+        {
+            float s = DpiScale;
+
+            _title.Font = new Font(Font.FontFamily, 20f * s, FontStyle.Bold);
+            _title.Height = (int)Math.Round(70 * s);
+
+            _subtitle.Font = new Font(Font.FontFamily, 9f * s);
+            _subtitle.Height = (int)Math.Round(26 * s);
+
+            _status.Font = new Font(Font.FontFamily, 8.5f * s);
+            _status.Height = (int)Math.Round(28 * s);
+            _status.Padding = new Padding((int)Math.Round(14 * s), 0, 0, 0);
+
+            _tiles.Padding = new Padding(
+                (int)Math.Round(20 * s), (int)Math.Round(6 * s),
+                (int)Math.Round(20 * s), (int)Math.Round(6 * s));
+
+            foreach (Control c in _tiles.Controls)
+            {
+                c.Margin = new Padding((int)Math.Round(6 * s));
+            }
         }
 
         private void BuildUi()
         {
-            var title = new Label
+            _title = new Label
             {
                 Text = "D A R K N E S S T O O L",
                 Dock = DockStyle.Top,
-                Height = 70,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font(Font.FontFamily, 20f, FontStyle.Bold),
                 ForeColor = TextPrimary,
                 BackColor = Color.Transparent
             };
 
-            var subtitle = new Label
+            _subtitle = new Label
             {
                 Text = "версия 1.0",
                 Dock = DockStyle.Top,
-                Height = 26,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font(Font.FontFamily, 9f),
                 ForeColor = TextSecond,
                 BackColor = Color.Transparent
             };
@@ -61,7 +103,6 @@ namespace DarknessTool
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                Padding = new Padding(20, 6, 20, 6),
                 BackColor = Color.Transparent,
                 AutoScroll = true,
                 GrowStyle = TableLayoutPanelGrowStyle.AddRows
@@ -82,29 +123,26 @@ namespace DarknessTool
             AddTile("📖", "Справка",           "Документация и руководства", false);
             AddTile("⚙", "Настройки",         "Тема, VT, пути", false);
 
-            var status = new Label
+            _status = new Label
             {
                 Dock = DockStyle.Bottom,
-                Height = 28,
                 Text = BuildStatusText(),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(14, 0, 0, 0),
                 ForeColor = TextSecond,
-                BackColor = Color.FromArgb(0x0F, 0x1E, 0x33),
-                Font = new Font(Font.FontFamily, 8.5f)
+                BackColor = StatusBg,
+                AutoEllipsis = true
             };
 
             Controls.Add(_tiles);
-            Controls.Add(subtitle);
-            Controls.Add(title);
-            Controls.Add(status);
+            Controls.Add(_subtitle);
+            Controls.Add(_title);
+            Controls.Add(_status);
         }
 
         private void AddTile(string icon, string title, string subtitle, bool dangerous)
         {
             var tile = new TileControl(icon, title, subtitle, dangerous)
             {
-                Margin = new Padding(6),
                 Dock = DockStyle.Fill
             };
             tile.Click += (s, e) => MessageBox.Show(
@@ -145,7 +183,10 @@ namespace DarknessTool
 
         private static Bitmap RenderBackground(int w, int h)
         {
-            var bmp = new Bitmap(w, h);
+            if (w <= 0 || h <= 0) w = Math.Max(1, w);
+            if (h <= 0) h = Math.Max(1, h);
+
+            var bmp = new Bitmap(Math.Max(1, w), Math.Max(1, h));
             using var g = Graphics.FromImage(bmp);
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
