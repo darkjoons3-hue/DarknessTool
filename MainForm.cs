@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Reflection;
 using System.Security.Principal;
 using System.Windows.Forms;
 
@@ -14,6 +15,9 @@ namespace DarknessTool
         private Label _subtitle = null!;
         private Label _status = null!;
 
+        private Rectangle _btnSettings, _btnAbout, _btnLog;
+        private int _hoverBtn = -1; // 0=settings, 1=about, 2=log
+
         private static readonly Color BgTop       = Color.FromArgb(0x0A, 0x14, 0x28);
         private static readonly Color BgBottom    = Color.FromArgb(0x05, 0x0A, 0x14);
         private static readonly Color GridColor   = Color.FromArgb(13, 0x1A, 0x2A, 0x44);
@@ -22,6 +26,8 @@ namespace DarknessTool
         private static readonly Color TextPrimary = Color.FromArgb(0xE8, 0xE8, 0xE8);
         private static readonly Color TextSecond  = Color.FromArgb(0x88, 0x99, 0xAA);
         private static readonly Color StatusBg    = Color.FromArgb(0x0F, 0x1E, 0x33);
+        private static readonly Color BtnTopBg    = Color.FromArgb(0x14, 0x26, 0x42);
+        private static readonly Color BtnTopHover = Color.FromArgb(0x1E, 0x3A, 0x5F);
 
         public MainForm()
         {
@@ -37,7 +43,6 @@ namespace DarknessTool
             BuildUi();
             ApplyDpiScaling();
 
-            // Начальный размер — с учётом DPI, но не больше рабочего стола
             var wa = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
             int targetW = Math.Min(LogicalToDeviceUnits(920), wa.Width - 20);
             int targetH = Math.Min(LogicalToDeviceUnits(760), wa.Height - 20);
@@ -53,6 +58,25 @@ namespace DarknessTool
             _backgroundCache = null;
             ApplyDpiScaling();
             Invalidate();
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            UpdateButtonRects();
+            Invalidate();
+        }
+
+        private void UpdateButtonRects()
+        {
+            float s = DpiScale;
+            int size = (int)Math.Round(30 * s);
+            int pad  = (int)Math.Round(8 * s);
+            int y    = (int)Math.Round(10 * s);
+
+            _btnLog      = new Rectangle(Width - pad - size, y, size, size);
+            _btnAbout    = new Rectangle(_btnLog.X - pad - size, y, size, size);
+            _btnSettings = new Rectangle(_btnAbout.X - pad - size, y, size, size);
         }
 
         private void ApplyDpiScaling()
@@ -74,9 +98,9 @@ namespace DarknessTool
                 (int)Math.Round(20 * s), (int)Math.Round(6 * s));
 
             foreach (Control c in _tiles.Controls)
-            {
                 c.Margin = new Padding((int)Math.Round(6 * s));
-            }
+
+            UpdateButtonRects();
         }
 
         private void BuildUi()
@@ -92,7 +116,7 @@ namespace DarknessTool
 
             _subtitle = new Label
             {
-                Text = "версия 1.0",
+                Text = "версия " + GetVersionString(),
                 Dock = DockStyle.Top,
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = TextSecond,
@@ -137,6 +161,20 @@ namespace DarknessTool
             Controls.Add(_subtitle);
             Controls.Add(_title);
             Controls.Add(_status);
+
+            MouseMove += MainForm_MouseMove;
+            MouseClick += MainForm_MouseClick;
+        }
+
+        private static string GetVersionString()
+        {
+            try
+            {
+                var v = Assembly.GetExecutingAssembly().GetName().Version;
+                if (v == null) return "1.0.0";
+                return $"{v.Major}.{v.Minor}.{v.Build}";
+            }
+            catch { return "1.0.0"; }
         }
 
         private void AddTile(string icon, string title, string subtitle, bool dangerous)
@@ -158,7 +196,8 @@ namespace DarknessTool
         {
             bool admin = IsAdmin();
             string adminMark = admin ? "● да" : "● нет";
-            return $"  Админ: {adminMark}      Среда: Windows      VT: не настроен      v1.0.0";
+            string env = IsWinRE() ? "WinRE" : "Windows";
+            return $"  Админ: {adminMark}      Среда: {env}      VT: не настроен      v{GetVersionString()}";
         }
 
         private static bool IsAdmin()
@@ -167,6 +206,93 @@ namespace DarknessTool
             var principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
+
+        private static bool IsWinRE()
+        {
+            try
+            {
+                var sys = Environment.SystemDirectory ?? "";
+                return sys.StartsWith("X:", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        // ============ КНОПКИ В ПРАВОМ ВЕРХНЕМ УГЛУ ============
+
+        private void MainForm_MouseMove(object? sender, MouseEventArgs e)
+        {
+            int prev = _hoverBtn;
+            _hoverBtn = -1;
+            if (_btnSettings.Contains(e.Location)) _hoverBtn = 0;
+            else if (_btnAbout.Contains(e.Location)) _hoverBtn = 1;
+            else if (_btnLog.Contains(e.Location)) _hoverBtn = 2;
+
+            Cursor = _hoverBtn >= 0 ? Cursors.Hand : Cursors.Default;
+
+            if (prev != _hoverBtn)
+                Invalidate(new Rectangle(_btnSettings.X - 4, _btnSettings.Y - 4,
+                    (_btnLog.Right - _btnSettings.X) + 8, _btnSettings.Height + 8));
+        }
+
+        private void MainForm_MouseClick(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+
+            if (_btnSettings.Contains(e.Location))
+                MessageBox.Show("Настройки пока в разработке.", "DarknessTool");
+            else if (_btnAbout.Contains(e.Location))
+                new AboutForm().ShowDialog(this);
+            else if (_btnLog.Contains(e.Location))
+                MessageBox.Show("Журнал изменений появится в v1.2.", "DarknessTool");
+        }
+
+        private void DrawCornerButtons(Graphics g)
+        {
+            float s = DpiScale;
+            var family = SystemFonts.MessageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif;
+            using var font = new Font(family, 11f * s);
+
+            DrawCornerButton(g, _btnSettings, "⚙", _hoverBtn == 0, font, s);
+            DrawCornerButton(g, _btnAbout,    "ℹ", _hoverBtn == 1, font, s);
+            DrawCornerButton(g, _btnLog,      "📜", _hoverBtn == 2, font, s);
+        }
+
+        private void DrawCornerButton(Graphics g, Rectangle r, string glyph, bool hover, Font font, float s)
+        {
+            int radius = (int)Math.Round(6 * s);
+            using var path = RoundedRect(r, radius);
+
+            using (var b = new SolidBrush(hover ? BtnTopHover : BtnTopBg))
+                g.FillPath(b, path);
+
+            using (var pen = new Pen(hover
+                ? Color.FromArgb(0x4A, 0x9E, 0xFF)
+                : Color.FromArgb(0x1A, 0x2A, 0x44), 1f))
+                g.DrawPath(pen, path);
+
+            using var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            };
+            using var tb = new SolidBrush(TextPrimary);
+            g.DrawString(glyph, font, tb, r, sf);
+        }
+
+        private static GraphicsPath RoundedRect(Rectangle r, int radius)
+        {
+            var path = new GraphicsPath();
+            int d = radius * 2;
+            if (d <= 0) { path.AddRectangle(r); return path; }
+            path.AddArc(r.X, r.Y, d, d, 180, 90);
+            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        // ============ ФОН ============
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
@@ -181,12 +307,18 @@ namespace DarknessTool
             e.Graphics.DrawImageUnscaled(_backgroundCache, 0, 0);
         }
 
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            DrawCornerButtons(e.Graphics);
+        }
+
         private static Bitmap RenderBackground(int w, int h)
         {
-            if (w <= 0 || h <= 0) w = Math.Max(1, w);
-            if (h <= 0) h = Math.Max(1, h);
+            if (w <= 0) w = 1;
+            if (h <= 0) h = 1;
 
-            var bmp = new Bitmap(Math.Max(1, w), Math.Max(1, h));
+            var bmp = new Bitmap(w, h);
             using var g = Graphics.FromImage(bmp);
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
