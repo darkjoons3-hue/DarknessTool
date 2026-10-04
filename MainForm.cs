@@ -16,7 +16,7 @@ namespace DarknessTool
         private Label _status = null!;
 
         private Rectangle _btnSettings, _btnAbout, _btnLog;
-        private int _hoverBtn = -1; // 0=settings, 1=about, 2=log
+        private int _hoverBtn = -1;
 
         private static readonly Color BgTop       = Color.FromArgb(0x0A, 0x14, 0x28);
         private static readonly Color BgBottom    = Color.FromArgb(0x05, 0x0A, 0x14);
@@ -39,6 +39,8 @@ namespace DarknessTool
             ForeColor = TextPrimary;
             Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
             MinimumSize = new Size(600, 480);
+
+            BackupManager.EnsureDirs();
 
             BuildUi();
             ApplyDpiScaling();
@@ -197,7 +199,8 @@ namespace DarknessTool
             bool admin = IsAdmin();
             string adminMark = admin ? "● да" : "● нет";
             string env = IsWinRE() ? "WinRE" : "Windows";
-            return $"  Админ: {adminMark}      Среда: {env}      VT: не настроен      v{GetVersionString()}";
+            int qCount = BackupManager.GetQuarantineCount();
+            return $"  Админ: {adminMark}      Среда: {env}      VT: не настроен      Карантин: {qCount} файл(ов)      v{GetVersionString()}";
         }
 
         private static bool IsAdmin()
@@ -216,8 +219,6 @@ namespace DarknessTool
             }
             catch { return false; }
         }
-
-        // ============ КНОПКИ В ПРАВОМ ВЕРХНЕМ УГЛУ ============
 
         private void MainForm_MouseMove(object? sender, MouseEventArgs e)
         {
@@ -239,11 +240,19 @@ namespace DarknessTool
             if (e.Button != MouseButtons.Left) return;
 
             if (_btnSettings.Contains(e.Location))
+            {
                 MessageBox.Show("Настройки пока в разработке.", "DarknessTool");
+            }
             else if (_btnAbout.Contains(e.Location))
+            {
                 new AboutForm().ShowDialog(this);
+            }
             else if (_btnLog.Contains(e.Location))
-                MessageBox.Show("Журнал изменений появится в v1.2.", "DarknessTool");
+            {
+                new LogForm().ShowDialog(this);
+                // Обновим статус — счётчик карантина мог измениться
+                _status.Text = BuildStatusText();
+            }
         }
 
         private void DrawCornerButtons(Graphics g)
@@ -291,8 +300,6 @@ namespace DarknessTool
             path.CloseFigure();
             return path;
         }
-
-        // ============ ФОН ============
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
