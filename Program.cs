@@ -15,6 +15,13 @@ namespace DarknessTool
 
             try
             {
+                // Сначала — сплэш-скрин (блокирует ~1.8 сек)
+                using (var splash = new SplashForm())
+                {
+                    splash.ShowDialog();
+                }
+
+                // Потом — главное окно
                 Application.Run(new MainForm());
             }
             catch (Exception ex)
