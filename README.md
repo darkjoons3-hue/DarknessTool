@@ -1,6 +1,7 @@
-# 🛡️ DarknessTool 1.0
+# 🛡️ DarknessTool 1.1
 
-**Портативная утилита для восстановления Windows после заражения, снятия блокировок и безопасной очистки системы. Работает в живой Windows и в WinRE.**
+🇷🇺 **Русская версия** · 🇬🇧 [English version](README_md)
+Портативная утилита для восстановления Windows после заражения, снятия блокировок и безопасной очисочисткитемы. Работает в живой Windows и в WinRE.**
 
 [![Release](https://img.shields.io/github/v/release/darkjoons3-hue/DarknessTool1.0ver?label=release)](https://github.com/darkjoons3-hue/DarknessTool1.0ver/releases/latest)
 [![Build](https://github.com/darkjoons3-hue/DarknessTool1.0ver/actions/workflows/build.yml/badge.svg)](https://github.com/darkjoons3-hue/DarknessTool1.0ver/actions/workflows/build.yml)
