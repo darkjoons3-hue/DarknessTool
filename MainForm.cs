@@ -29,9 +29,29 @@ namespace DarknessTool
         private static readonly Color BtnTopBg    = Color.FromArgb(0x14, 0x26, 0x42);
         private static readonly Color BtnTopHover = Color.FromArgb(0x1E, 0x3A, 0x5F);
 
+        // ============ МАСКИРОВКА ОКНА ============
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                // Рандомизируем имя класса окна — защита от EnumWindows + FindWindow
+                if (!string.IsNullOrEmpty(WindowMasker.CurrentClassName))
+                    cp.ClassName = WindowMasker.CurrentClassName;
+                return cp;
+            }
+        }
+
         public MainForm()
         {
-            Text = "DarknessTool 1.0";
+            // Генерируем случайное имя класса ДО создания handle
+            WindowMasker.GenerateClassName();
+
+            // Генерируем случайный заголовок
+            bool masked = true; // позже — из настроек
+            Text = WindowMasker.GenerateTitle(masked);
+
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true;
@@ -173,10 +193,10 @@ namespace DarknessTool
             try
             {
                 var v = Assembly.GetExecutingAssembly().GetName().Version;
-                if (v == null) return "1.0.0";
+                if (v == null) return "1.2.0";
                 return $"{v.Major}.{v.Minor}.{v.Build}";
             }
-            catch { return "1.0.0"; }
+            catch { return "1.2.0"; }
         }
 
         private void AddTile(string icon, string title, string subtitle, bool dangerous)
@@ -250,7 +270,6 @@ namespace DarknessTool
             else if (_btnLog.Contains(e.Location))
             {
                 new LogForm().ShowDialog(this);
-                // Обновим статус — счётчик карантина мог измениться
                 _status.Text = BuildStatusText();
             }
         }
