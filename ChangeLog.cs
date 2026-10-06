@@ -67,18 +67,27 @@ namespace DarknessTool
         {
             lock (_lock)
             {
-                try
+                var candidates = new[]
                 {
-                    if (!File.Exists(FilePath)) return new List<ChangeEntry>();
-                    var txt = File.ReadAllText(FilePath);
-                    if (string.IsNullOrWhiteSpace(txt)) return new List<ChangeEntry>();
-                    return JsonSerializer.Deserialize<List<ChangeEntry>>(txt, _jsonOpts)
-                           ?? new List<ChangeEntry>();
-                }
-                catch
+                    FilePath,
+                    PathHelper.BackupChangeLogFile,
+                    PathHelper.PortableChangeLogFile
+                };
+
+                foreach (var path in candidates)
                 {
-                    return new List<ChangeEntry>();
+                    try
+                    {
+                        if (!File.Exists(path)) continue;
+                        var txt = File.ReadAllText(path);
+                        if (string.IsNullOrWhiteSpace(txt)) continue;
+                        var result = JsonSerializer.Deserialize<List<ChangeEntry>>(txt, _jsonOpts);
+                        if (result != null) return result;
+                    }
+                    catch { }
                 }
+
+                return new List<ChangeEntry>();
             }
         }
 
@@ -91,9 +100,26 @@ namespace DarknessTool
                     Directory.CreateDirectory(BaseDir);
                     var txt = JsonSerializer.Serialize(entries, _jsonOpts);
                     File.WriteAllText(FilePath, txt);
+
+                    TryCopy(FilePath, PathHelper.BackupChangeLogFile);
+
+                    if (PathHelper.UsePortableCopy)
+                        TryCopy(FilePath, PathHelper.PortableChangeLogFile);
                 }
                 catch { }
             }
+        }
+
+        private static void TryCopy(string source, string dest)
+        {
+            try
+            {
+                var fullDir = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(fullDir))
+                    Directory.CreateDirectory(fullDir);
+                File.Copy(source, dest, true);
+            }
+            catch { }
         }
 
         public static void Append(ChangeEntry entry)
