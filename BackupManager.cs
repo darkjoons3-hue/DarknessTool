@@ -1,23 +1,20 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Text;
 
 namespace DarknessTool
 {
     public static class BackupManager
     {
-        public static string BaseDir =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DarknessTool");
+        public static string BaseDir => PathHelper.BaseDir;
 
-        public static string BackupsRegistryDir => Path.Combine(BaseDir, "Backups", "registry");
-        public static string QuarantineFilesDir  => Path.Combine(BaseDir, "Quarantine", "files");
+        public static string BackupsRegistryDir => PathHelper.RegistryBackupDir;
+        public static string QuarantineFilesDir  => PathHelper.QuarantineDir;
 
         public static void EnsureDirs()
         {
-            Directory.CreateDirectory(BackupsRegistryDir);
-            Directory.CreateDirectory(QuarantineFilesDir);
+            PathHelper.EnsureAll();
         }
 
         // ============ РЕЕСТР ============
@@ -112,7 +109,6 @@ namespace DarknessTool
                               DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".quar";
                 string dest = Path.Combine(QuarantineFilesDir, safe);
 
-                // Копируем, потом удаляем оригинал
                 File.Copy(originalPath, dest, true);
                 try { File.SetAttributes(originalPath, FileAttributes.Normal); } catch { }
                 File.Delete(originalPath);
