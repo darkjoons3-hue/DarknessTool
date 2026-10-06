@@ -9,14 +9,18 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>DarknessTool</AssemblyName>
     <RootNamespace>DarknessTool</RootNamespace>
-    <Version>1.1.0</Version>
-    <FileVersion>1.1.0.0</FileVersion>
-    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
     <Product>DarknessTool</Product>
     <AssemblyTitle>DarknessTool</AssemblyTitle>
     <Company>darkjoons3-hue</Company>
     <Copyright>MIT</Copyright>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
 
 </Project>
