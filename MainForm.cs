@@ -247,11 +247,21 @@ namespace DarknessTool
             {
                 Dock = DockStyle.Fill
             };
-            tile.Click += (s, e) => MessageBox.Show(
-                $"Раздел «{title}» пока в разработке.",
-                "DarknessTool",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            tile.Click += (s, e) =>
+            {
+                if (title == "Диспетчер задач")
+                {
+                    new TaskManagerForm().ShowDialog(this);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"Раздел «{title}» пока в разработке.",
+                        "DarknessTool",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            };
 
             _tiles.Controls.Add(tile);
         }
