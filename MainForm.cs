@@ -1,3 +1,4 @@
+
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -70,7 +71,6 @@ namespace DarknessTool
             int targetH = Math.Min(LogicalToDeviceUnits(760), wa.Height - 20);
             Size = new Size(targetW, targetH);
 
-            // Инициализируем трей после того, как окно создано
             Load += (s, e) =>
             {
                 _tray = new TrayIcon(this);
