@@ -77,22 +77,19 @@ namespace DarknessTool
             Load += (s, e) =>
             {
                 _tray = new TrayIcon(this);
-            };
 
-            if (restarted)
-            {
-                Load += (s, e) =>
+                var integrity = IntegrityChecker.Check();
+                IntegrityChecker.ShowIfProblems(integrity);
+
+                if (restarted)
                 {
                     _tray?.ShowBalloon(
                         "⚠️ Программа была закрыта неожиданно",
                         "Возможно, malware пытался её отключить. DarknessTool перезапущен.");
-                };
-            }
+                }
+            };
         }
 
-        /// <summary>
-        /// Принудительное закрытие — вызывается только из меню трея «Выход».
-        /// </summary>
         public void ForceClose()
         {
             _forceClose = true;
@@ -101,9 +98,6 @@ namespace DarknessTool
             Close();
         }
 
-        /// <summary>
-        /// Клик на крестик = свернуть в трей, а не закрыть.
-        /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (!_forceClose && e.CloseReason == CloseReason.UserClosing)
