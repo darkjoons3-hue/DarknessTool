@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace DarknessTool
@@ -7,16 +8,31 @@ namespace DarknessTool
     internal static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            // Проверка единственного экземпляра — ДО всего остального
+            // === Режим watchdog ===
+            if (args.Length >= 2 && args[0] == "--watchdog")
+            {
+                if (int.TryParse(args[1], out int parentPid))
+                {
+                    WatchdogRunner.Run(parentPid);
+                }
+                return;
+            }
+
+            bool restarted = args.Contains("--restarted");
+
+            // Проверка единственного экземпляра
             if (!SingleInstance.TryAcquire())
             {
-                MessageBox.Show(
-                    "DarknessTool уже запущен.\n\nПроверь панель задач и трей.",
-                    "DarknessTool",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                if (!restarted)
+                {
+                    MessageBox.Show(
+                        "DarknessTool уже запущен.\n\nПроверь панель задач и трей.",
+                        "Runtime Host",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
                 return;
             }
 
@@ -26,12 +42,17 @@ namespace DarknessTool
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
+                // Запускаем watchdog (не блокирует)
+                WatchdogHelper.StartWatchdog();
+
+                // Сплэш
                 using (var splash = new SplashForm())
                 {
                     splash.ShowDialog();
                 }
 
-                Application.Run(new MainForm());
+                // Главное окно
+                Application.Run(new MainForm(restarted));
             }
             catch (Exception ex)
             {
@@ -50,6 +71,7 @@ namespace DarknessTool
             }
             finally
             {
+                WatchdogHelper.StopWatchdog();
                 SingleInstance.Release();
             }
         }
