@@ -53,10 +53,9 @@ namespace DarknessTool
     {
         private static readonly object _lock = new object();
 
-        public static string BaseDir =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DarknessTool");
+        public static string BaseDir => PathHelper.BaseDir;
 
-        public static string FilePath => Path.Combine(BaseDir, "changelog.json");
+        public static string FilePath => PathHelper.ChangeLogFile;
 
         private static readonly JsonSerializerOptions _jsonOpts = new JsonSerializerOptions
         {
