@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Management;
 using System.Runtime.InteropServices;
-using System.Security.Principal;
-using System.Threading;
 
 namespace DarknessTool
 {
@@ -24,9 +22,6 @@ namespace DarknessTool
             var now = DateTime.UtcNow;
             var elapsed = (now - _prevSampleTime).TotalMilliseconds;
             if (elapsed <= 0) elapsed = 1;
-
-            // Собираем пользователей через WMI (быстрее, чем GetProcessOwner)
-            var owners = BuildOwnerMap();
 
             Process[] processes;
             try { processes = Process.GetProcesses(); }
@@ -50,6 +45,7 @@ namespace DarknessTool
                         if (_prevCpu.TryGetValue(p.Id, out var prevCpu))
                         {
                             double deltaMs = (cpuTime - prevCpu).TotalMilliseconds;
+                            if (deltaMs < 0) deltaMs = 0;
                             info.CpuPercent = (deltaMs / elapsed) * 100.0 / coreCount;
                         }
                         _prevCpu[p.Id] = cpuTime;
@@ -62,11 +58,8 @@ namespace DarknessTool
                     // Путь
                     try { info.FilePath = p.MainModule?.FileName ?? ""; } catch { }
 
-                    // Пользователь из WMI
-                    if (owners.TryGetValue(p.Id, out var user))
-                        info.UserName = user;
-                    else
-                        info.UserName = "";
+                    // Пользователь (медленно, но надёжно)
+                    info.UserName = GetProcessOwner(p.Id);
 
                     // Время старта
                     try { info.StartTime = p.StartTime; } catch { }
@@ -97,49 +90,6 @@ namespace DarknessTool
         }
 
         /// <summary>
-        /// Карта PID → пользователь через WMI (Win32_Process).
-        /// </summary>
-        private static Dictionary<int, string> BuildOwnerMap()
-        {
-            var map = new Dictionary<int, string>();
-            try
-            {
-                using var searcher = new ManagementObjectSearcher(
-                    "SELECT ProcessId, Name FROM Win32_Process");
-                foreach (var obj in searcher.Get())
-                {
-                    try
-                    {
-                        int pid = Convert.ToInt32(obj["ProcessId"]);
-                        var ownerArr = (string[]?)obj.InvokeMethod("GetOwner", null, null);
-                        // InvokeMethod немного не то, но оставим для совместимости
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-
-            // Более надёжный способ — через GetOwnerSid или NetAPI. 
-            // Пока — fallback через GetProcessOwner из System.Diagnostics.
-            try
-            {
-                foreach (var p in Process.GetProcesses())
-                {
-                    try
-                    {
-                        var handle = p.Handle;
-                        // через System.Management
-                    }
-                    catch { }
-                    finally { p.Dispose(); }
-                }
-            }
-            catch { }
-
-            return map;
-        }
-
-        /// <summary>
         /// Получить пользователя для процесса через WMI.
         /// </summary>
         public static string GetProcessOwner(int pid)
@@ -148,16 +98,18 @@ namespace DarknessTool
             {
                 using var searcher = new ManagementObjectSearcher(
                     $"SELECT * FROM Win32_Process WHERE ProcessId = {pid}");
-                foreach (ManagementObject obj in searcher.Get())
+
+                foreach (ManagementBaseObject baseObj in searcher.Get())
                 {
+                    if (baseObj is not ManagementObject obj) continue;
+
                     var outParams = obj.InvokeMethod("GetOwner", null, null);
-                    if (outParams != null)
-                    {
-                        var user = outParams["User"] as string ?? "";
-                        var domain = outParams["Domain"] as string ?? "";
-                        if (!string.IsNullOrEmpty(user))
-                            return string.IsNullOrEmpty(domain) ? user : $"{domain}\\{user}";
-                    }
+                    if (outParams == null) continue;
+
+                    var user = outParams["User"] as string ?? "";
+                    var domain = outParams["Domain"] as string ?? "";
+                    if (!string.IsNullOrEmpty(user))
+                        return string.IsNullOrEmpty(domain) ? user : $"{domain}\\{user}";
                 }
             }
             catch { }
@@ -178,9 +130,8 @@ namespace DarknessTool
             catch { return false; }
         }
 
-        /// <summary>
-        /// Заморозить/разморозить процесс через ntdll.
-        /// </summary>
+        // ============ ЗАМОРОЗКА / РАЗМОРОЗКА ============
+
         [DllImport("ntdll.dll", SetLastError = true)]
         private static extern int NtSuspendProcess(IntPtr processHandle);
 
@@ -192,7 +143,9 @@ namespace DarknessTool
             try
             {
                 var p = Process.GetProcessById(pid);
-                return NtSuspendProcess(p.Handle) == 0;
+                int result = NtSuspendProcess(p.Handle);
+                p.Dispose();
+                return result == 0;
             }
             catch { return false; }
         }
@@ -202,7 +155,9 @@ namespace DarknessTool
             try
             {
                 var p = Process.GetProcessById(pid);
-                return NtResumeProcess(p.Handle) == 0;
+                int result = NtResumeProcess(p.Handle);
+                p.Dispose();
+                return result == 0;
             }
             catch { return false; }
         }
