@@ -18,6 +18,9 @@ namespace DarknessTool
         private Rectangle _btnSettings, _btnAbout, _btnLog;
         private int _hoverBtn = -1;
 
+        private TrayIcon? _tray;
+        private bool _forceClose = false;
+
         private static readonly Color BgTop       = Color.FromArgb(0x0A, 0x14, 0x28);
         private static readonly Color BgBottom    = Color.FromArgb(0x05, 0x0A, 0x14);
         private static readonly Color GridColor   = Color.FromArgb(13, 0x1A, 0x2A, 0x44);
@@ -36,7 +39,6 @@ namespace DarknessTool
             get
             {
                 var cp = base.CreateParams;
-                // Рандомизируем имя класса окна — защита от EnumWindows + FindWindow
                 if (!string.IsNullOrEmpty(WindowMasker.CurrentClassName))
                     cp.ClassName = WindowMasker.CurrentClassName;
                 return cp;
@@ -45,11 +47,9 @@ namespace DarknessTool
 
         public MainForm()
         {
-            // Генерируем случайное имя класса ДО создания handle
             WindowMasker.GenerateClassName();
 
-            // Генерируем случайный заголовок
-            bool masked = true; // позже — из настроек
+            bool masked = true;
             Text = WindowMasker.GenerateTitle(masked);
 
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -69,6 +69,41 @@ namespace DarknessTool
             int targetW = Math.Min(LogicalToDeviceUnits(920), wa.Width - 20);
             int targetH = Math.Min(LogicalToDeviceUnits(760), wa.Height - 20);
             Size = new Size(targetW, targetH);
+
+            // Инициализируем трей после того, как окно создано
+            Load += (s, e) =>
+            {
+                _tray = new TrayIcon(this);
+            };
+        }
+
+        /// <summary>
+        /// Принудительное закрытие — вызывается только из меню трея «Выход».
+        /// </summary>
+        public void ForceClose()
+        {
+            _forceClose = true;
+            _tray?.Dispose();
+            _tray = null;
+            Close();
+        }
+
+        /// <summary>
+        /// Клик на крестик = свернуть в трей, а не закрыть.
+        /// </summary>
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!_forceClose && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                Hide();
+                _tray?.ShowBalloon(
+                    "DarknessTool продолжает работать",
+                    "Программа свёрнута в трей. Двойной клик по иконке — развернуть.");
+                return;
+            }
+
+            base.OnFormClosing(e);
         }
 
         private float DpiScale => DeviceDpi / 96f;
