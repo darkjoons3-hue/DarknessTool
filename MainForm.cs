@@ -1,4 +1,3 @@
-
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -46,7 +45,11 @@ namespace DarknessTool
             }
         }
 
-        public MainForm()
+        // ============ КОНСТРУКТОРЫ ============
+
+        public MainForm() : this(false) { }
+
+        public MainForm(bool restarted)
         {
             WindowMasker.GenerateClassName();
 
@@ -75,6 +78,16 @@ namespace DarknessTool
             {
                 _tray = new TrayIcon(this);
             };
+
+            if (restarted)
+            {
+                Load += (s, e) =>
+                {
+                    _tray?.ShowBalloon(
+                        "⚠️ Программа была закрыта неожиданно",
+                        "Возможно, malware пытался её отключить. DarknessTool перезапущен.");
+                };
+            }
         }
 
         /// <summary>
