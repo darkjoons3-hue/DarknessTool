@@ -19,17 +19,23 @@ namespace DarknessTool
 
         // ============ РЕЕСТР ============
 
-        /// <summary>
-        /// Экспорт ветки реестра в .reg файл. Возвращает путь к бэкапу или пустую строку.
-        /// </summary>
         public static string BackupRegistryKey(string hive, string subKey)
         {
             try
             {
                 EnsureDirs();
+
                 string safeName = SafeFileName(hive + "_" + subKey) + "_" +
                                   DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".reg";
-                string path = Path.Combine(BackupsRegistryDir, safeName);
+
+                string mainPath = Path.Combine(BackupsRegistryDir, safeName);
+
+                if (File.Exists(mainPath))
+                {
+                    safeName = Path.GetFileNameWithoutExtension(safeName) + "_" +
+                               Guid.NewGuid().ToString("N").Substring(0, 4) + ".reg";
+                    mainPath = Path.Combine(BackupsRegistryDir, safeName);
+                }
 
                 string fullKey = hive + "\\" + subKey;
                 if (!fullKey.StartsWith("HKEY", StringComparison.OrdinalIgnoreCase))
@@ -38,7 +44,7 @@ namespace DarknessTool
                 var psi = new ProcessStartInfo
                 {
                     FileName = "reg.exe",
-                    Arguments = $"export \"{fullKey}\" \"{path}\" /y",
+                    Arguments = $"export \"{fullKey}\" \"{mainPath}\" /y",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -48,10 +54,15 @@ namespace DarknessTool
                 if (p == null) return "";
                 p.WaitForExit(8000);
 
-                if (p.ExitCode == 0 && File.Exists(path))
-                    return path;
+                if (p.ExitCode != 0 || !File.Exists(mainPath))
+                    return "";
 
-                return "";
+                TryCopyToBackup(mainPath, Path.Combine(PathHelper.BackupRegistryBackupDir, safeName));
+
+                if (PathHelper.UsePortableCopy)
+                    TryCopyToBackup(mainPath, Path.Combine(PathHelper.PortableRegistryBackupDir, safeName));
+
+                return mainPath;
             }
             catch { return ""; }
         }
@@ -94,9 +105,6 @@ namespace DarknessTool
 
         // ============ ФАЙЛЫ (карантин) ============
 
-        /// <summary>
-        /// Перемещает файл в карантин. Возвращает путь к .quar-файлу или пустую строку.
-        /// </summary>
         public static string QuarantineFile(string originalPath)
         {
             try
@@ -110,6 +118,11 @@ namespace DarknessTool
                 string dest = Path.Combine(QuarantineFilesDir, safe);
 
                 File.Copy(originalPath, dest, true);
+
+                TryCopyToBackup(dest, Path.Combine(PathHelper.BackupQuarantineDir, safe));
+                if (PathHelper.UsePortableCopy)
+                    TryCopyToBackup(dest, Path.Combine(PathHelper.PortableQuarantineDir, safe));
+
                 try { File.SetAttributes(originalPath, FileAttributes.Normal); } catch { }
                 File.Delete(originalPath);
 
@@ -118,9 +131,6 @@ namespace DarknessTool
             catch { return ""; }
         }
 
-        /// <summary>
-        /// Копирование файла в карантин без удаления (для бэкапа).
-        /// </summary>
         public static string CopyToQuarantine(string originalPath)
         {
             try
@@ -134,6 +144,11 @@ namespace DarknessTool
                 string dest = Path.Combine(QuarantineFilesDir, safe);
 
                 File.Copy(originalPath, dest, true);
+
+                TryCopyToBackup(dest, Path.Combine(PathHelper.BackupQuarantineDir, safe));
+                if (PathHelper.UsePortableCopy)
+                    TryCopyToBackup(dest, Path.Combine(PathHelper.PortableQuarantineDir, safe));
+
                 return dest;
             }
             catch { return ""; }
@@ -192,6 +207,38 @@ namespace DarknessTool
         }
 
         // ============ УТИЛИТЫ ============
+
+        private static void TryCopyToBackup(string source, string dest)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+                File.Copy(source, dest, true);
+            }
+            catch { }
+        }
+
+        public static string? FindBackupCopy(string fileName)
+        {
+            try
+            {
+                var candidates = new[]
+                {
+                    Path.Combine(QuarantineFilesDir, fileName),
+                    Path.Combine(PathHelper.BackupQuarantineDir, fileName),
+                    Path.Combine(PathHelper.PortableQuarantineDir, fileName)
+                };
+
+                foreach (var c in candidates)
+                {
+                    if (File.Exists(c)) return c;
+                }
+            }
+            catch { }
+            return null;
+        }
 
         public static string SafeFileName(string name)
         {
