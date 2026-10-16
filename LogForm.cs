@@ -36,7 +36,7 @@ namespace DarknessTool
             DoubleBuffered = true;
             BackColor = BgTop;
             ForeColor = TextPrimary;
-            Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
+            Font = SafeFont.Make(9f);
             ClientSize = new Size(880, 520);
             MinimumSize = new Size(700, 420);
 
@@ -60,25 +60,21 @@ namespace DarknessTool
 
             var restoreBtn = MakeButton("↺  Восстановить выбранное", BtnBg, TextPrimary);
             restoreBtn.Width = 220;
-            restoreBtn.Margin = new Padding(8, 0, 0, 0);
             restoreBtn.Click += (s, e) => RestoreSelected();
 
             var refreshBtn = MakeButton("⟳", BtnBg, TextPrimary);
             refreshBtn.Width = 40;
-            refreshBtn.Margin = new Padding(8, 0, 0, 0);
             refreshBtn.Click += (s, e) => LoadEntries();
 
             var clearBtn = MakeButton("🗑 Очистить журнал", BtnBg, TextPrimary);
             clearBtn.Width = 160;
-            clearBtn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            clearBtn.Margin = new Padding(8, 0, 0, 0);
             clearBtn.Click += (s, e) => ClearLog();
 
             var flow = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
-                BackColor = Color.Transparent,
+                BackColor = PanelBg,
                 WrapContents = false,
                 AutoScroll = true
             };
@@ -106,12 +102,12 @@ namespace DarknessTool
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
                 ColumnHeadersHeight = 34,
                 EnableHeadersVisualStyles = false,
-                Font = new Font(Font.FontFamily, 9f)
+                Font = SafeFont.Make(9f)
             };
 
             _grid.ColumnHeadersDefaultCellStyle.BackColor = PanelBg;
             _grid.ColumnHeadersDefaultCellStyle.ForeColor = TextPrimary;
-            _grid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 9f, FontStyle.Bold);
+            _grid.ColumnHeadersDefaultCellStyle.Font = SafeFont.Make(9f, FontStyle.Bold);
             _grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = PanelBg;
             _grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextPrimary;
             _grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
@@ -127,11 +123,11 @@ namespace DarknessTool
             _grid.AlternatingRowsDefaultCellStyle.ForeColor = TextPrimary;
             _grid.AlternatingRowsDefaultCellStyle.SelectionBackColor = GridSelBg;
 
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Time",  HeaderText = "Время",       FillWeight = 14 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Type",  HeaderText = "Тип",         FillWeight = 18 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Desc",  HeaderText = "Описание",    FillWeight = 36 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Target",HeaderText = "Объект",      FillWeight = 26 });
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "State", HeaderText = "Статус",      FillWeight = 10 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Time",   HeaderText = "Время",    FillWeight = 14 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Type",   HeaderText = "Тип",      FillWeight = 18 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Desc",   HeaderText = "Описание", FillWeight = 36 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Target", HeaderText = "Объект",   FillWeight = 26 });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "State",  HeaderText = "Статус",   FillWeight = 10 });
 
             _summary = new Label
             {
@@ -141,7 +137,7 @@ namespace DarknessTool
                 Padding = new Padding(14, 0, 0, 0),
                 ForeColor = TextSecond,
                 BackColor = PanelBg,
-                Font = new Font(Font.FontFamily, 8.5f)
+                Font = SafeFont.Make(8.5f)
             };
 
             Controls.Add(_grid);
@@ -158,9 +154,10 @@ namespace DarknessTool
                 FlatStyle = FlatStyle.Flat,
                 BackColor = bg,
                 ForeColor = fg,
-                Font = new Font(Font.FontFamily, 9.5f),
+                Font = SafeFont.Make(9.5f),
                 Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleCenter
+                TextAlign = ContentAlignment.MiddleCenter,
+                Margin = new Padding(0, 0, 8, 0)
             };
             btn.FlatAppearance.BorderSize = 0;
             btn.FlatAppearance.MouseOverBackColor = BtnHover;
@@ -169,33 +166,39 @@ namespace DarknessTool
 
         private void LoadEntries()
         {
-            _entries = ChangeLog.Load()
-                .OrderByDescending(x => x.Timestamp)
-                .ToList();
-
-            _grid.Rows.Clear();
-            foreach (var e in _entries)
+            try
             {
-                string state = e.Undone ? "отменено" : (e.CanUndo ? "можно откатить" : "—");
-                int idx = _grid.Rows.Add(
-                    e.Timestamp.ToString("dd.MM HH:mm:ss"),
-                    e.TypeDisplay,
-                    e.Description,
-                    ShortTarget(e.Target),
-                    state);
+                _entries = ChangeLog.Load()
+                    .OrderByDescending(x => x.Timestamp)
+                    .ToList();
 
-                if (e.Undone)
-                    _grid.Rows[idx].DefaultCellStyle.ForeColor = TextSecond;
-                else if (!e.CanUndo)
-                    _grid.Rows[idx].DefaultCellStyle.ForeColor = TextSecond;
-                else
-                    _grid.Rows[idx].DefaultCellStyle.ForeColor = Success;
+                _grid.Rows.Clear();
+                foreach (var e in _entries)
+                {
+                    string state = e.Undone ? "отменено" : (e.CanUndo ? "можно откатить" : "—");
+                    int idx = _grid.Rows.Add(
+                        e.Timestamp.ToString("dd.MM HH:mm:ss"),
+                        e.TypeDisplay,
+                        e.Description,
+                        ShortTarget(e.Target),
+                        state);
+
+                    if (e.Undone || !e.CanUndo)
+                        _grid.Rows[idx].DefaultCellStyle.ForeColor = TextSecond;
+                    else
+                        _grid.Rows[idx].DefaultCellStyle.ForeColor = Success;
+                }
+
+                int total = _entries.Count;
+                int undoable = _entries.Count(x => x.CanUndo && !x.Undone);
+                long qsize = BackupManager.GetQuarantineSize();
+                _summary.Text = $"  Всего записей: {total}   ·   Можно откатить: {undoable}   ·   Карантин: {BackupManager.GetQuarantineCount()} файлов, {FormatSize(qsize)}";
             }
-
-            int total = _entries.Count;
-            int undoable = _entries.Count(x => x.CanUndo && !x.Undone);
-            long qsize = BackupManager.GetQuarantineSize();
-            _summary.Text = $"  Всего записей: {total}   ·   Можно откатить: {undoable}   ·   Карантин: {BackupManager.GetQuarantineCount()} файлов, {FormatSize(qsize)}";
+            catch (Exception ex)
+            {
+                _summary.Text = "  Ошибка загрузки журнала: " + ex.Message;
+                StartupLog.WriteException("LogForm.LoadEntries", ex);
+            }
         }
 
         private static string ShortTarget(string target)
@@ -259,16 +262,10 @@ namespace DarknessTool
             if (idx < 0 || idx >= _entries.Count) return;
             var entry = _entries[idx];
 
-            if (entry.Undone)
+            if (entry.Undone || !entry.CanUndo)
             {
-                MessageBox.Show("Эта запись уже отменена.", "DarknessTool",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            if (!entry.CanUndo)
-            {
-                MessageBox.Show("Эта запись не поддерживает откат.", "DarknessTool",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Эта запись уже отменена или не поддерживает откат.",
+                    "DarknessTool", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -309,9 +306,16 @@ namespace DarknessTool
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            using var brush = new LinearGradientBrush(
-                ClientRectangle, BgTop, BgBottom, 90f);
-            e.Graphics.FillRectangle(brush, ClientRectangle);
+            try
+            {
+                using var brush = new LinearGradientBrush(
+                    ClientRectangle, BgTop, BgBottom, 90f);
+                e.Graphics.FillRectangle(brush, ClientRectangle);
+            }
+            catch
+            {
+                try { e.Graphics.Clear(BgTop); } catch { }
+            }
         }
     }
 }
