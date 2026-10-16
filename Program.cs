@@ -10,69 +10,94 @@ namespace DarknessTool
         [STAThread]
         static void Main(string[] args)
         {
-            // === Режим watchdog ===
+            try { StartupLog.WriteHeader(); } catch { }
+
+            // Режим watchdog
             if (args.Length >= 2 && args[0] == "--watchdog")
             {
                 if (int.TryParse(args[1], out int parentPid))
                 {
-                    WatchdogRunner.Run(parentPid);
+                    try { StartupLog.Write($"Starting watchdog for PID {parentPid}"); } catch { }
+                    try { WatchdogRunner.Run(parentPid); } catch { }
                 }
                 return;
             }
 
             bool restarted = args.Contains("--restarted");
 
-            // Проверка единственного экземпляра
             if (!SingleInstance.TryAcquire())
             {
+                try { StartupLog.Write("Single instance check: already running"); } catch { }
                 if (!restarted)
                 {
-                    MessageBox.Show(
-                        "DarknessTool уже запущен.\n\nПроверь панель задач и трей.",
-                        "Runtime Host",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
+                    try
+                    {
+                        MessageBox.Show(
+                            "DarknessTool уже запущен.\n\nПроверь панель задач и трей.",
+                            "Runtime Host",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                    catch { }
                 }
                 return;
             }
 
             try
             {
-                Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
+                try { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); } catch { }
+                try { Application.EnableVisualStyles(); } catch { }
+                try { Application.SetCompatibleTextRenderingDefault(false); } catch { }
 
-                // Запускаем watchdog (не блокирует)
-                WatchdogHelper.StartWatchdog();
+                try { WatchdogHelper.StartWatchdog(); } catch { }
 
-                // Сплэш
-                using (var splash = new SplashForm())
+                try
                 {
-                    splash.ShowDialog();
+                    using (var splash = new SplashForm())
+                    {
+                        splash.ShowDialog();
+                    }
+                }
+                catch (Exception ex) { StartupLog.WriteException("Splash", ex); }
+
+                MainForm mainForm;
+                try
+                {
+                    mainForm = new MainForm(restarted);
+                }
+                catch (Exception ex)
+                {
+                    StartupLog.WriteException("MainForm ctor", ex);
+                    MessageBox.Show(
+                        "Не удалось создать главное окно:\n\n" + ex.Message +
+                        "\n\nЛог: " + StartupLog.LogPath,
+                        "Ошибка запуска",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    return;
                 }
 
-                // Главное окно
-                Application.Run(new MainForm(restarted));
+                Application.Run(mainForm);
             }
             catch (Exception ex)
             {
+                StartupLog.WriteException("Main", ex);
                 try
                 {
-                    var log = Path.Combine(Path.GetTempPath(), "WinRtCache_error.log");
-                    File.AppendAllText(log, $"[{DateTime.Now:O}] {ex}\n\n");
+                    MessageBox.Show(
+                        "Произошла ошибка:\n\n" + ex.Message +
+                        "\n\nЛог: " + StartupLog.LogPath,
+                        "Runtime Host",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
                 catch { }
-
-                MessageBox.Show(
-                    "Произошла ошибка:\n\n" + ex.Message,
-                    "Runtime Host",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
             }
             finally
             {
-                WatchdogHelper.StopWatchdog();
-                SingleInstance.Release();
+                try { WatchdogHelper.StopWatchdog(); } catch { }
+                try { SingleInstance.Release(); } catch { }
+                try { StartupLog.Write("Application exited"); } catch { }
             }
         }
     }
