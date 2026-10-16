@@ -12,7 +12,7 @@ namespace DarknessTool
 {
     public class AboutForm : Form
     {
-        private const string RepoUrl = "https://github.com/darkjoons3-hue/DarknessTool1.0ver";
+        private const string RepoUrl = "https://github.com/darkjoons3-hue/DarknessTool";
 
         private static readonly Color BgTop       = Color.FromArgb(0x0A, 0x14, 0x28);
         private static readonly Color BgBottom    = Color.FromArgb(0x05, 0x0A, 0x14);
@@ -32,7 +32,7 @@ namespace DarknessTool
             DoubleBuffered = true;
             BackColor = BgTop;
             ForeColor = TextPrimary;
-            Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
+            Font = SafeFont.Make(9f);
             ClientSize = new Size(520, 480);
 
             BuildUi();
@@ -43,13 +43,14 @@ namespace DarknessTool
             var logo = new LogoPanel
             {
                 Dock = DockStyle.Top,
-                Height = 140
+                Height = 140,
+                BackColor = BgTop
             };
 
             var version = Assembly.GetExecutingAssembly().GetName().Version;
             string verStr = version != null
                 ? $"{version.Major}.{version.Minor}.{version.Build}"
-                : "1.0.0";
+                : "1.2.0";
 
             var title = new Label
             {
@@ -57,9 +58,9 @@ namespace DarknessTool
                 Dock = DockStyle.Top,
                 Height = 34,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font(Font.FontFamily, 15f, FontStyle.Bold),
+                Font = SafeFont.Make(15f, FontStyle.Bold),
                 ForeColor = TextPrimary,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             var subtitle = new Label
@@ -68,9 +69,9 @@ namespace DarknessTool
                 Dock = DockStyle.Top,
                 Height = 40,
                 TextAlign = ContentAlignment.TopCenter,
-                Font = new Font(Font.FontFamily, 9f),
+                Font = SafeFont.Make(9f),
                 ForeColor = TextSecond,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             var author = new Label
@@ -79,9 +80,9 @@ namespace DarknessTool
                 Dock = DockStyle.Top,
                 Height = 24,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font(Font.FontFamily, 8.5f),
+                Font = SafeFont.Make(8.5f),
                 ForeColor = TextSecond,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             var buttons = new TableLayoutPanel
@@ -89,7 +90,7 @@ namespace DarknessTool
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 Padding = new Padding(40, 12, 40, 12),
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             buttons.Controls.Add(MakeButton("🐞  Сообщить о баге", () => OpenUrl(RepoUrl + "/issues/new?title=Баг&body=**Описание:**%0A%0A**Шаги воспроизведения:**%0A%0A**Ожидалось:**%0A%0A**Получил:**%0A%0A" + GetSystemInfo())));
@@ -105,8 +106,10 @@ namespace DarknessTool
                 FlatStyle = FlatStyle.Flat,
                 BackColor = BtnBg,
                 ForeColor = TextPrimary,
-                FlatAppearance = { BorderSize = 0 }
+                Font = SafeFont.Make(9.5f)
             };
+            closeBtn.FlatAppearance.BorderSize = 0;
+            closeBtn.FlatAppearance.MouseOverBackColor = BtnHover;
             closeBtn.Click += (s, e) => Close();
 
             Controls.Add(buttons);
@@ -130,13 +133,17 @@ namespace DarknessTool
                 FlatStyle = FlatStyle.Flat,
                 BackColor = BtnBg,
                 ForeColor = TextPrimary,
-                Font = new Font(Font.FontFamily, 10f),
-                FlatAppearance = { BorderSize = 0, MouseOverBackColor = BtnHover }
+                Font = SafeFont.Make(10f)
             };
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseOverBackColor = BtnHover;
             btn.Click += (s, e) =>
             {
                 try { onClick(); }
-                catch (Exception ex) { MessageBox.Show("Не удалось: " + ex.Message, "DarknessTool"); }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Не удалось: " + ex.Message, "DarknessTool");
+                }
             };
             return btn;
         }
@@ -166,7 +173,7 @@ namespace DarknessTool
             var sb = new StringBuilder();
             sb.AppendLine("=== DarknessTool — информация о системе ===");
             var ver = Assembly.GetExecutingAssembly().GetName().Version;
-            sb.AppendLine($"DarknessTool: {(ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.0.0")}");
+            sb.AppendLine($"DarknessTool: {(ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.2.0")}");
             sb.AppendLine($"ОС: {Environment.OSVersion}");
             sb.AppendLine($"Архитектура: {RuntimeInformation.OSArchitecture}");
             sb.AppendLine($".NET: {Environment.Version}");
@@ -179,8 +186,12 @@ namespace DarknessTool
 
         private static bool IsAdmin()
         {
-            using var id = WindowsIdentity.GetCurrent();
-            return new WindowsPrincipal(id).IsInRole(WindowsBuiltInRole.Administrator);
+            try
+            {
+                using var id = WindowsIdentity.GetCurrent();
+                return new WindowsPrincipal(id).IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch { return false; }
         }
 
         private static bool IsWinRE()
@@ -195,56 +206,72 @@ namespace DarknessTool
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            using var brush = new LinearGradientBrush(
-                ClientRectangle, BgTop, BgBottom, 90f);
-            e.Graphics.FillRectangle(brush, ClientRectangle);
+            try
+            {
+                using var brush = new LinearGradientBrush(
+                    ClientRectangle, BgTop, BgBottom, 90f);
+                e.Graphics.FillRectangle(brush, ClientRectangle);
+            }
+            catch
+            {
+                try { e.Graphics.Clear(BgTop); } catch { }
+            }
         }
 
         private class LogoPanel : Panel
         {
-            public LogoPanel() { DoubleBuffered = true; BackColor = Color.Transparent; }
+            public LogoPanel()
+            {
+                DoubleBuffered = true;
+                BackColor = Color.FromArgb(0x0A, 0x14, 0x28);
+            }
 
             protected override void OnPaint(PaintEventArgs e)
             {
-                var g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-
-                float s = DeviceDpi / 96f;
-                float size = 90 * s;
-                float x = (Width - size) / 2f;
-                float y = (Height - size) / 2f + 5 * s;
-
-                using var path = new GraphicsPath();
-                float r = 10 * s;
-                float w = size, h = size * 0.9f;
-
-                path.AddLine(x + w / 2, y, x + w / 2 + r, y + r * 0.5f);
-                path.AddLine(x + w / 2 + r, y + r * 0.5f, x + w - r, y + h - r);
-                path.AddArc(x + w - r * 2, y + h - r * 2, r * 2, r * 2, 0, 90);
-                path.AddLine(x + w - r, y + h - r, x + r, y + h - r);
-                path.AddArc(x, y + h - r * 2, r * 2, r * 2, 90, 90);
-                path.AddLine(x + r, y + h - r, x + w / 2 - r, y + r * 0.5f);
-                path.CloseFigure();
-
-                using (var b = new LinearGradientBrush(
-                    new RectangleF(x, y, w, h),
-                    Color.FromArgb(0x0E, 0x3A, 0x5C),
-                    Color.FromArgb(0x07, 0x1E, 0x33), 90f))
-                    g.FillPath(b, path);
-
-                using (var p = new Pen(Color.FromArgb(0x4A, 0x9E, 0xFF), 2f * s))
-                    g.DrawPath(p, path);
-
-                var family = SystemFonts.MessageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif;
-                using var font = new Font(family, size / 2.4f, FontStyle.Bold);
-                using var sf = new StringFormat
+                try
                 {
-                    Alignment = StringAlignment.Center,
-                    LineAlignment = StringAlignment.Center
-                };
-                using var textBrush = new SolidBrush(Color.White);
-                g.DrawString("DT", font, textBrush,
-                    new RectangleF(x, y + h * 0.35f, w, h * 0.5f), sf);
+                    var g = e.Graphics;
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                    float s = 1f;
+                    try { s = DeviceDpi / 96f; } catch { }
+
+                    float size = 90 * s;
+                    float x = (Width - size) / 2f;
+                    float y = (Height - size) / 2f + 5 * s;
+
+                    using var path = new GraphicsPath();
+                    float r = 10 * s;
+                    float w = size, h = size * 0.9f;
+
+                    path.AddLine(x + w / 2, y, x + w / 2 + r, y + r * 0.5f);
+                    path.AddLine(x + w / 2 + r, y + r * 0.5f, x + w - r, y + h - r);
+                    path.AddArc(x + w - r * 2, y + h - r * 2, r * 2, r * 2, 0, 90);
+                    path.AddLine(x + w - r, y + h - r, x + r, y + h - r);
+                    path.AddArc(x, y + h - r * 2, r * 2, r * 2, 90, 90);
+                    path.AddLine(x + r, y + h - r, x + w / 2 - r, y + r * 0.5f);
+                    path.CloseFigure();
+
+                    using (var b = new LinearGradientBrush(
+                        new RectangleF(x, y, w, h),
+                        Color.FromArgb(0x0E, 0x3A, 0x5C),
+                        Color.FromArgb(0x07, 0x1E, 0x33), 90f))
+                        g.FillPath(b, path);
+
+                    using (var p = new Pen(Color.FromArgb(0x4A, 0x9E, 0xFF), 2f * s))
+                        g.DrawPath(p, path);
+
+                    using var font = SafeFont.Make(size / 2.4f, FontStyle.Bold);
+                    using var sf = new StringFormat
+                    {
+                        Alignment = StringAlignment.Center,
+                        LineAlignment = StringAlignment.Center
+                    };
+                    using var textBrush = new SolidBrush(Color.White);
+                    g.DrawString("DT", font, textBrush,
+                        new RectangleF(x, y + h * 0.35f, w, h * 0.5f), sf);
+                }
+                catch { }
             }
         }
     }
