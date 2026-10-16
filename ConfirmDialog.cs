@@ -37,7 +37,7 @@ namespace DarknessTool
             DoubleBuffered = true;
             BackColor = BgTop;
             ForeColor = TextPrimary;
-            Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
+            Font = SafeFont.Make(9f);
             ClientSize = new Size(480, 220);
             Padding = new Padding(1);
 
@@ -48,9 +48,9 @@ namespace DarknessTool
                 Height = 44,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(20, 0, 20, 0),
-                Font = new Font(Font.FontFamily, 12f, FontStyle.Bold),
+                Font = SafeFont.Make(12f, FontStyle.Bold),
                 ForeColor = dangerous ? Danger : TextPrimary,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             var msgLbl = new Label
@@ -58,16 +58,16 @@ namespace DarknessTool
                 Text = message,
                 Dock = DockStyle.Fill,
                 Padding = new Padding(20, 8, 20, 8),
-                Font = new Font(Font.FontFamily, 9.5f),
+                Font = SafeFont.Make(9.5f),
                 ForeColor = TextSecond,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             var btnPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
                 Height = 56,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             var okBtn = new Button
@@ -77,7 +77,7 @@ namespace DarknessTool
                 FlatStyle = FlatStyle.Flat,
                 BackColor = dangerous ? Danger : Accent,
                 ForeColor = Color.White,
-                Font = new Font(Font.FontFamily, 9.5f, FontStyle.Bold),
+                Font = SafeFont.Make(9.5f, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             okBtn.FlatAppearance.BorderSize = 0;
@@ -91,7 +91,7 @@ namespace DarknessTool
                 FlatStyle = FlatStyle.Flat,
                 BackColor = BtnBg,
                 ForeColor = TextPrimary,
-                Font = new Font(Font.FontFamily, 9.5f),
+                Font = SafeFont.Make(9.5f),
                 Cursor = Cursors.Hand
             };
             cancelBtn.FlatAppearance.BorderSize = 0;
@@ -113,7 +113,6 @@ namespace DarknessTool
             Controls.Add(btnPanel);
             Controls.Add(titleLbl);
 
-            // Ресайз под контент
             btnPanel.PerformLayout();
             btnPanel.Width = ClientSize.Width;
             LayoutButtons();
@@ -130,16 +129,27 @@ namespace DarknessTool
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaint(e);
-            using var pen = new Pen(BorderCol, 1f);
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            try
+            {
+                base.OnPaint(e);
+                using var pen = new Pen(BorderCol, 1f);
+                e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            }
+            catch { }
         }
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            using var brush = new LinearGradientBrush(
-                ClientRectangle, BgTop, BgBottom, 90f);
-            e.Graphics.FillRectangle(brush, ClientRectangle);
+            try
+            {
+                using var brush = new LinearGradientBrush(
+                    ClientRectangle, BgTop, BgBottom, 90f);
+                e.Graphics.FillRectangle(brush, ClientRectangle);
+            }
+            catch
+            {
+                try { e.Graphics.Clear(BgTop); } catch { }
+            }
         }
     }
 }
