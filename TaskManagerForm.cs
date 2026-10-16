@@ -37,7 +37,7 @@ namespace DarknessTool
             DoubleBuffered = true;
             BackColor = BgTop;
             ForeColor = TextPrimary;
-            Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
+            Font = SafeFont.Make(9f);
             ClientSize = new Size(980, 600);
             MinimumSize = new Size(700, 420);
 
@@ -50,7 +50,6 @@ namespace DarknessTool
 
         private void BuildUi()
         {
-            // Верхняя панель
             var top = new Panel
             {
                 Dock = DockStyle.Top,
@@ -93,7 +92,7 @@ namespace DarknessTool
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
-                BackColor = Color.Transparent,
+                BackColor = PanelBg,
                 WrapContents = false,
                 AutoScroll = true
             };
@@ -106,7 +105,6 @@ namespace DarknessTool
 
             top.Controls.Add(flow);
 
-            // Таблица
             _grid = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -124,12 +122,12 @@ namespace DarknessTool
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
                 ColumnHeadersHeight = 34,
                 EnableHeadersVisualStyles = false,
-                Font = new Font(Font.FontFamily, 9f)
+                Font = SafeFont.Make(9f)
             };
 
             _grid.ColumnHeadersDefaultCellStyle.BackColor = PanelBg;
             _grid.ColumnHeadersDefaultCellStyle.ForeColor = TextPrimary;
-            _grid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 9f, FontStyle.Bold);
+            _grid.ColumnHeadersDefaultCellStyle.Font = SafeFont.Make(9f, FontStyle.Bold);
             _grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = PanelBg;
             _grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextPrimary;
             _grid.ColumnHeadersDefaultCellStyle.Padding = new Padding(6, 0, 0, 0);
@@ -154,7 +152,6 @@ namespace DarknessTool
 
             _grid.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) ShowProperties(); };
 
-            // Нижняя строка статуса
             _status = new Label
             {
                 Dock = DockStyle.Bottom,
@@ -163,7 +160,7 @@ namespace DarknessTool
                 Padding = new Padding(14, 0, 0, 0),
                 ForeColor = TextSecond,
                 BackColor = PanelBg,
-                Font = new Font(Font.FontFamily, 8.5f)
+                Font = SafeFont.Make(8.5f)
             };
 
             Controls.Add(_grid);
@@ -180,7 +177,7 @@ namespace DarknessTool
                 FlatStyle = FlatStyle.Flat,
                 BackColor = bg,
                 ForeColor = fg,
-                Font = new Font(Font.FontFamily, 9.5f),
+                Font = SafeFont.Make(9.5f),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Margin = new Padding(0, 0, 8, 0)
@@ -207,13 +204,9 @@ namespace DarknessTool
                 foreach (var p in _processes)
                 {
                     _grid.Rows.Add(
-                        p.Pid,
-                        p.Name,
-                        p.UserName,
-                        p.CpuDisplay,
-                        p.MemoryDisplay,
-                        p.ThreadsCount,
-                        p.FilePath);
+                        p.Pid, p.Name, p.UserName,
+                        p.CpuDisplay, p.MemoryDisplay,
+                        p.ThreadsCount, p.FilePath);
                 }
 
                 _grid.ResumeLayout();
@@ -237,6 +230,7 @@ namespace DarknessTool
             catch (Exception ex)
             {
                 _status.Text = "  Ошибка обновления: " + ex.Message;
+                StartupLog.WriteException("TaskManagerForm.RefreshList", ex);
             }
         }
 
@@ -334,9 +328,16 @@ namespace DarknessTool
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            using var brush = new LinearGradientBrush(
-                ClientRectangle, BgTop, BgBottom, 90f);
-            e.Graphics.FillRectangle(brush, ClientRectangle);
+            try
+            {
+                using var brush = new LinearGradientBrush(
+                    ClientRectangle, BgTop, BgBottom, 90f);
+                e.Graphics.FillRectangle(brush, ClientRectangle);
+            }
+            catch
+            {
+                try { e.Graphics.Clear(BgTop); } catch { }
+            }
         }
     }
 }
