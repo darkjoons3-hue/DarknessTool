@@ -32,60 +32,73 @@ namespace DarknessTool
         private static readonly Color BtnTopBg    = Color.FromArgb(0x14, 0x26, 0x42);
         private static readonly Color BtnTopHover = Color.FromArgb(0x1E, 0x3A, 0x5F);
 
-        // ============ МАСКИРОВКА ОКНА ============
-
         protected override CreateParams CreateParams
         {
             get
             {
                 var cp = base.CreateParams;
-                if (!string.IsNullOrEmpty(WindowMasker.CurrentClassName))
-                    cp.ClassName = WindowMasker.CurrentClassName;
+                try
+                {
+                    if (!string.IsNullOrEmpty(WindowMasker.CurrentClassName))
+                        cp.ClassName = WindowMasker.CurrentClassName;
+                }
+                catch { }
                 return cp;
             }
         }
-
-        // ============ КОНСТРУКТОРЫ ============
 
         public MainForm() : this(false) { }
 
         public MainForm(bool restarted)
         {
-            WindowMasker.GenerateClassName();
+            try { WindowMasker.GenerateClassName(); } catch { }
 
-            bool masked = true;
-            Text = WindowMasker.GenerateTitle(masked);
+            try { Text = WindowMasker.GenerateTitle(true); }
+            catch { Text = "Runtime Host"; }
 
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true;
             BackColor = BgTop;
             ForeColor = TextPrimary;
-            Font = SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont;
+            Font = SafeFont.Make(9f);
             MinimumSize = new Size(600, 480);
 
-            BackupManager.EnsureDirs();
+            try { BackupManager.EnsureDirs(); } catch { }
 
             BuildUi();
             ApplyDpiScaling();
 
-            var wa = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
-            int targetW = Math.Min(LogicalToDeviceUnits(920), wa.Width - 20);
-            int targetH = Math.Min(LogicalToDeviceUnits(760), wa.Height - 20);
-            Size = new Size(targetW, targetH);
+            try
+            {
+                var wa = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
+                int targetW = Math.Min(LogicalToDeviceUnits(920), Math.Max(600, wa.Width - 20));
+                int targetH = Math.Min(LogicalToDeviceUnits(760), Math.Max(480, wa.Height - 20));
+                Size = new Size(targetW, targetH);
+            }
+            catch { Size = new Size(920, 760); }
 
             Load += (s, e) =>
             {
-                _tray = new TrayIcon(this);
+                try { _tray = new TrayIcon(this); }
+                catch (Exception ex) { StartupLog.WriteException("TrayIcon", ex); }
 
-                var integrity = IntegrityChecker.Check();
-                IntegrityChecker.ShowIfProblems(integrity);
+                try
+                {
+                    var integrity = IntegrityChecker.Check();
+                    IntegrityChecker.ShowIfProblems(integrity);
+                }
+                catch (Exception ex) { StartupLog.WriteException("IntegrityChecker", ex); }
 
                 if (restarted)
                 {
-                    _tray?.ShowBalloon(
-                        "⚠️ Программа была закрыта неожиданно",
-                        "Возможно, malware пытался её отключить. DarknessTool перезапущен.");
+                    try
+                    {
+                        _tray?.ShowBalloon(
+                            "⚠️ Программа была закрыта неожиданно",
+                            "Возможно, malware пытался её отключить. DarknessTool перезапущен.");
+                    }
+                    catch { }
                 }
             };
         }
@@ -93,7 +106,7 @@ namespace DarknessTool
         public void ForceClose()
         {
             _forceClose = true;
-            _tray?.Dispose();
+            try { _tray?.Dispose(); } catch { }
             _tray = null;
             Close();
         }
@@ -104,16 +117,26 @@ namespace DarknessTool
             {
                 e.Cancel = true;
                 Hide();
-                _tray?.ShowBalloon(
-                    "DarknessTool продолжает работать",
-                    "Программа свёрнута в трей. Двойной клик по иконке — развернуть.");
+                try
+                {
+                    _tray?.ShowBalloon(
+                        "DarknessTool продолжает работать",
+                        "Программа свёрнута в трей. Двойной клик по иконке — развернуть.");
+                }
+                catch { }
                 return;
             }
-
             base.OnFormClosing(e);
         }
 
-        private float DpiScale => DeviceDpi / 96f;
+        private float DpiScale
+        {
+            get
+            {
+                try { return DeviceDpi / 96f; }
+                catch { return 1f; }
+            }
+        }
 
         protected override void OnDpiChanged(DpiChangedEventArgs e)
         {
@@ -133,38 +156,46 @@ namespace DarknessTool
 
         private void UpdateButtonRects()
         {
-            float s = DpiScale;
-            int size = (int)Math.Round(30 * s);
-            int pad  = (int)Math.Round(8 * s);
-            int y    = (int)Math.Round(10 * s);
+            try
+            {
+                float s = DpiScale;
+                int size = (int)Math.Round(30 * s);
+                int pad  = (int)Math.Round(8 * s);
+                int y    = (int)Math.Round(10 * s);
 
-            _btnLog      = new Rectangle(Width - pad - size, y, size, size);
-            _btnAbout    = new Rectangle(_btnLog.X - pad - size, y, size, size);
-            _btnSettings = new Rectangle(_btnAbout.X - pad - size, y, size, size);
+                _btnLog      = new Rectangle(Width - pad - size, y, size, size);
+                _btnAbout    = new Rectangle(_btnLog.X - pad - size, y, size, size);
+                _btnSettings = new Rectangle(_btnAbout.X - pad - size, y, size, size);
+            }
+            catch { }
         }
 
         private void ApplyDpiScaling()
         {
-            float s = DpiScale;
+            try
+            {
+                float s = DpiScale;
 
-            _title.Font = new Font(Font.FontFamily, 20f * s, FontStyle.Bold);
-            _title.Height = (int)Math.Round(70 * s);
+                _title.Font = SafeFont.Make(20f * s, FontStyle.Bold);
+                _title.Height = (int)Math.Round(70 * s);
 
-            _subtitle.Font = new Font(Font.FontFamily, 9f * s);
-            _subtitle.Height = (int)Math.Round(26 * s);
+                _subtitle.Font = SafeFont.Make(9f * s);
+                _subtitle.Height = (int)Math.Round(26 * s);
 
-            _status.Font = new Font(Font.FontFamily, 8.5f * s);
-            _status.Height = (int)Math.Round(28 * s);
-            _status.Padding = new Padding((int)Math.Round(14 * s), 0, 0, 0);
+                _status.Font = SafeFont.Make(8.5f * s);
+                _status.Height = (int)Math.Round(28 * s);
+                _status.Padding = new Padding((int)Math.Round(14 * s), 0, 0, 0);
 
-            _tiles.Padding = new Padding(
-                (int)Math.Round(20 * s), (int)Math.Round(6 * s),
-                (int)Math.Round(20 * s), (int)Math.Round(6 * s));
+                _tiles.Padding = new Padding(
+                    (int)Math.Round(20 * s), (int)Math.Round(6 * s),
+                    (int)Math.Round(20 * s), (int)Math.Round(6 * s));
 
-            foreach (Control c in _tiles.Controls)
-                c.Margin = new Padding((int)Math.Round(6 * s));
+                foreach (Control c in _tiles.Controls)
+                    c.Margin = new Padding((int)Math.Round(6 * s));
 
-            UpdateButtonRects();
+                UpdateButtonRects();
+            }
+            catch { }
         }
 
         private void BuildUi()
@@ -175,7 +206,7 @@ namespace DarknessTool
                 Dock = DockStyle.Top,
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = TextPrimary,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             _subtitle = new Label
@@ -184,14 +215,14 @@ namespace DarknessTool
                 Dock = DockStyle.Top,
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = TextSecond,
-                BackColor = Color.Transparent
+                BackColor = BgTop
             };
 
             _tiles = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                BackColor = Color.Transparent,
+                BackColor = BgTop,
                 AutoScroll = true,
                 GrowStyle = TableLayoutPanelGrowStyle.AddRows
             };
@@ -243,43 +274,69 @@ namespace DarknessTool
 
         private void AddTile(string icon, string title, string subtitle, bool dangerous)
         {
-            var tile = new TileControl(icon, title, subtitle, dangerous)
+            try
             {
-                Dock = DockStyle.Fill
-            };
-            tile.Click += (s, e) =>
-            {
-                if (title == "Диспетчер задач")
+                var tile = new TileControl(icon, title, subtitle, dangerous)
                 {
-                    new TaskManagerForm().ShowDialog(this);
-                }
-                else
+                    Dock = DockStyle.Fill
+                };
+                tile.Click += (s, e) =>
                 {
-                    MessageBox.Show(
-                        $"Раздел «{title}» пока в разработке.",
-                        "DarknessTool",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-                }
-            };
+                    if (title == "Диспетчер задач")
+                    {
+                        try { new TaskManagerForm().ShowDialog(this); }
+                        catch (Exception ex)
+                        {
+                            StartupLog.WriteException("Open TaskManager", ex);
+                            MessageBox.Show("Не удалось открыть диспетчер: " + ex.Message,
+                                "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            MessageBox.Show(
+                                $"Раздел «{title}» пока в разработке.",
+                                "DarknessTool",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                        catch { }
+                    }
+                };
 
-            _tiles.Controls.Add(tile);
+                _tiles.Controls.Add(tile);
+            }
+            catch (Exception ex)
+            {
+                StartupLog.WriteException("AddTile " + title, ex);
+            }
         }
 
         private static string BuildStatusText()
         {
-            bool admin = IsAdmin();
-            string adminMark = admin ? "● да" : "● нет";
-            string env = IsWinRE() ? "WinRE" : "Windows";
-            int qCount = BackupManager.GetQuarantineCount();
-            return $"  Админ: {adminMark}      Среда: {env}      VT: не настроен      Карантин: {qCount} файл(ов)      v{GetVersionString()}";
+            try
+            {
+                bool admin = IsAdmin();
+                string adminMark = admin ? "● да" : "● нет";
+                string env = IsWinRE() ? "WinRE" : "Windows";
+                int qCount = 0;
+                try { qCount = BackupManager.GetQuarantineCount(); } catch { }
+                return $"  Админ: {adminMark}      Среда: {env}      VT: не настроен      Карантин: {qCount} файл(ов)      v{GetVersionString()}";
+            }
+            catch { return "  Готов"; }
         }
 
         private static bool IsAdmin()
         {
-            using var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            try
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch { return false; }
         }
 
         private static bool IsWinRE()
@@ -294,69 +351,98 @@ namespace DarknessTool
 
         private void MainForm_MouseMove(object? sender, MouseEventArgs e)
         {
-            int prev = _hoverBtn;
-            _hoverBtn = -1;
-            if (_btnSettings.Contains(e.Location)) _hoverBtn = 0;
-            else if (_btnAbout.Contains(e.Location)) _hoverBtn = 1;
-            else if (_btnLog.Contains(e.Location)) _hoverBtn = 2;
+            try
+            {
+                int prev = _hoverBtn;
+                _hoverBtn = -1;
+                if (_btnSettings.Contains(e.Location)) _hoverBtn = 0;
+                else if (_btnAbout.Contains(e.Location)) _hoverBtn = 1;
+                else if (_btnLog.Contains(e.Location)) _hoverBtn = 2;
 
-            Cursor = _hoverBtn >= 0 ? Cursors.Hand : Cursors.Default;
+                Cursor = _hoverBtn >= 0 ? Cursors.Hand : Cursors.Default;
 
-            if (prev != _hoverBtn)
-                Invalidate(new Rectangle(_btnSettings.X - 4, _btnSettings.Y - 4,
-                    (_btnLog.Right - _btnSettings.X) + 8, _btnSettings.Height + 8));
+                if (prev != _hoverBtn)
+                    Invalidate(new Rectangle(_btnSettings.X - 4, _btnSettings.Y - 4,
+                        (_btnLog.Right - _btnSettings.X) + 8, _btnSettings.Height + 8));
+            }
+            catch { }
         }
 
         private void MainForm_MouseClick(object? sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
 
-            if (_btnSettings.Contains(e.Location))
+            try
             {
-                MessageBox.Show("Настройки пока в разработке.", "DarknessTool");
+                if (_btnSettings.Contains(e.Location))
+                {
+                    MessageBox.Show("Настройки пока в разработке.", "DarknessTool");
+                }
+                else if (_btnAbout.Contains(e.Location))
+                {
+                    try { new AboutForm().ShowDialog(this); } catch (Exception ex) { StartupLog.WriteException("AboutForm", ex); }
+                }
+                else if (_btnLog.Contains(e.Location))
+                {
+                    try
+                    {
+                        new LogForm().ShowDialog(this);
+                        _status.Text = BuildStatusText();
+                    }
+                    catch (Exception ex) { StartupLog.WriteException("LogForm", ex); }
+                }
             }
-            else if (_btnAbout.Contains(e.Location))
+            catch (Exception ex)
             {
-                new AboutForm().ShowDialog(this);
-            }
-            else if (_btnLog.Contains(e.Location))
-            {
-                new LogForm().ShowDialog(this);
-                _status.Text = BuildStatusText();
+                StartupLog.WriteException("MainForm_MouseClick", ex);
             }
         }
 
         private void DrawCornerButtons(Graphics g)
         {
-            float s = DpiScale;
-            var family = SystemFonts.MessageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif;
-            using var font = new Font(family, 11f * s);
+            try
+            {
+                float s = DpiScale;
+                using var font = SafeFont.Make(11f * s);
 
-            DrawCornerButton(g, _btnSettings, "⚙", _hoverBtn == 0, font, s);
-            DrawCornerButton(g, _btnAbout,    "ℹ", _hoverBtn == 1, font, s);
-            DrawCornerButton(g, _btnLog,      "📜", _hoverBtn == 2, font, s);
+                DrawCornerButton(g, _btnSettings, "⚙", _hoverBtn == 0, font, s);
+                DrawCornerButton(g, _btnAbout,    "ℹ", _hoverBtn == 1, font, s);
+                DrawCornerButton(g, _btnLog,      "📜", _hoverBtn == 2, font, s);
+            }
+            catch { }
         }
 
         private void DrawCornerButton(Graphics g, Rectangle r, string glyph, bool hover, Font font, float s)
         {
-            int radius = (int)Math.Round(6 * s);
-            using var path = RoundedRect(r, radius);
-
-            using (var b = new SolidBrush(hover ? BtnTopHover : BtnTopBg))
-                g.FillPath(b, path);
-
-            using (var pen = new Pen(hover
-                ? Color.FromArgb(0x4A, 0x9E, 0xFF)
-                : Color.FromArgb(0x1A, 0x2A, 0x44), 1f))
-                g.DrawPath(pen, path);
-
-            using var sf = new StringFormat
+            try
             {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
-            using var tb = new SolidBrush(TextPrimary);
-            g.DrawString(glyph, font, tb, r, sf);
+                int radius = (int)Math.Round(6 * s);
+                using var path = RoundedRect(r, radius);
+
+                using (var b = new SolidBrush(hover ? BtnTopHover : BtnTopBg))
+                    g.FillPath(b, path);
+
+                using (var pen = new Pen(hover
+                    ? Color.FromArgb(0x4A, 0x9E, 0xFF)
+                    : Color.FromArgb(0x1A, 0x2A, 0x44), 1f))
+                    g.DrawPath(pen, path);
+
+                using var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                using var tb = new SolidBrush(TextPrimary);
+                try
+                {
+                    g.DrawString(glyph, font, tb, r, sf);
+                }
+                catch
+                {
+                    try { g.FillEllipse(tb, r.X + r.Width / 2 - 3, r.Y + r.Height / 2 - 3, 6, 6); } catch { }
+                }
+            }
+            catch { }
         }
 
         private static GraphicsPath RoundedRect(Rectangle r, int radius)
@@ -374,21 +460,32 @@ namespace DarknessTool
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            if (_backgroundCache == null ||
-                _backgroundCache.Width != Width ||
-                _backgroundCache.Height != Height)
+            try
             {
-                _backgroundCache?.Dispose();
-                _backgroundCache = RenderBackground(Width, Height);
-            }
+                if (_backgroundCache == null ||
+                    _backgroundCache.Width != Width ||
+                    _backgroundCache.Height != Height)
+                {
+                    _backgroundCache?.Dispose();
+                    _backgroundCache = RenderBackground(Width, Height);
+                }
 
-            e.Graphics.DrawImageUnscaled(_backgroundCache, 0, 0);
+                e.Graphics.DrawImageUnscaled(_backgroundCache, 0, 0);
+            }
+            catch
+            {
+                try { e.Graphics.Clear(BgTop); } catch { }
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaint(e);
-            DrawCornerButtons(e.Graphics);
+            try
+            {
+                base.OnPaint(e);
+                DrawCornerButtons(e.Graphics);
+            }
+            catch { }
         }
 
         private static Bitmap RenderBackground(int w, int h)
@@ -404,33 +501,39 @@ namespace DarknessTool
                 new Rectangle(0, 0, w, h), BgTop, BgBottom, 90f))
                 g.FillRectangle(brush, 0, 0, w, h);
 
-            using (var pen = new Pen(GridColor, 1f))
+            try
             {
+                using var pen = new Pen(GridColor, 1f);
                 for (int x = 0; x < w; x += 60) g.DrawLine(pen, x, 0, x, h);
                 for (int y = 0; y < h; y += 60) g.DrawLine(pen, 0, y, w, y);
             }
+            catch { }
 
-            var rnd = new Random(20251004);
-            for (int i = 0; i < 18; i++)
+            try
             {
-                int size = rnd.Next(40, 90);
-                int x = rnd.Next(0, Math.Max(1, w));
-                int y = rnd.Next(0, Math.Max(1, h));
-                int alpha = rnd.Next(8, 18);
-
-                var color = (i % 5 == 0)
-                    ? Color.FromArgb(alpha, TriAccent.R, TriAccent.G, TriAccent.B)
-                    : Color.FromArgb(alpha, TriColor.R, TriColor.G, TriColor.B);
-
-                using var brush = new SolidBrush(color);
-                var pts = new[]
+                var rnd = new Random(20251004);
+                for (int i = 0; i < 18; i++)
                 {
-                    new Point(x, y),
-                    new Point(x + size, y + size / 3),
-                    new Point(x + size / 3, y + size)
-                };
-                g.FillPolygon(brush, pts);
+                    int size = rnd.Next(40, 90);
+                    int x = rnd.Next(0, Math.Max(1, w));
+                    int y = rnd.Next(0, Math.Max(1, h));
+                    int alpha = rnd.Next(8, 18);
+
+                    var color = (i % 5 == 0)
+                        ? Color.FromArgb(alpha, TriAccent.R, TriAccent.G, TriAccent.B)
+                        : Color.FromArgb(alpha, TriColor.R, TriColor.G, TriColor.B);
+
+                    using var brush = new SolidBrush(color);
+                    var pts = new[]
+                    {
+                        new Point(x, y),
+                        new Point(x + size, y + size / 3),
+                        new Point(x + size / 3, y + size)
+                    };
+                    g.FillPolygon(brush, pts);
+                }
             }
+            catch { }
 
             return bmp;
         }
